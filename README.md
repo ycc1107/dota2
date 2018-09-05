@@ -14,4 +14,4 @@ open dota data(real time)   --> data loader --> features engine --> trained mode
 dota picker data
 
 Data Flow Chart : 
-![alt text](![alt text](https://github.com/ycc1107/dota2/edit/master/flow.png "Flow")
+![alt text](https://github.com/ycc1107/dota2/edit/master/flow.png "Flow")
