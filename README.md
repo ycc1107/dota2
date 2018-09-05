@@ -12,3 +12,6 @@ online parts:
 
 open dota data(real time)   --> data loader --> features engine --> trained models --> predication<br>
 dota picker data
+
+Data Flow Chart : 
+![alt text](![alt text](https://github.com/ycc1107/dota2/edit/master/flow.png "Flow")
