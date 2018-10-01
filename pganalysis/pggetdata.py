@@ -8,7 +8,7 @@ pick_count=[0 for i in range(total_hero_num)] #count of the total appearance of 
 
 targethero = 0#change those two variables when you switch heroes
 targetdata = 'stuns_per_min'
-
+mark = 1
 start_time=time.time()
 for i2 in sliced_data:
     with open(i2,'r') as ms:
@@ -16,9 +16,18 @@ for i2 in sliced_data:
             data = json.loads(row)
             if 'players' in data:
                 for i in range(10):
-                    stuns_mat[data['players'][i]['hero_id']].append(data['players'][i]['benchmarks'][targetdata]['pct'])
+                    if data['players'][i]['radiant_win']==True:
+                        if i<=4:
+                            mark=1
+                        else:
+                            mark=0
+                    else:#dire win
+                        if i<=4:
+                            mark=0
+                        else:
+                            mark=1
+                    stuns_mat[data['players'][i]['hero_id']].append([data['players'][i]['benchmarks'][targetdata]['pct'],mark])
                     pick_count[data['players'][i]['hero_id']] += 1
-
 
 
 for i in range(total_hero_num):
