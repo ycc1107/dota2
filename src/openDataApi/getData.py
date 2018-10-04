@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import time
 from auth import KEY
 
 matchIdQuery = '''SELECT matches.match_id
@@ -11,9 +12,9 @@ matchQuery = 'https://api.opendota.com/api/matches/{}?{}'
 
 ROOT_PATH = os.path.abspath('..')
 
-def getMatchIds():
+def getMatchIds(force=False):
     filePath = ROOT_PATH + '\\src\\data\\matchId.txt'
-    if os.path.exists(filePath):
+    if os.path.exists(filePath) and not force:
         with open(filePath, 'rb') as stream:
             matchIds = [line for line in stream]
     else:
@@ -31,25 +32,37 @@ def getMatchIds():
 
 def getMatchData(matchIds):
     res = []
-    for idx, matchId in enumerate(matchIds):
+    idx = 0
+    matchCount = len(matchIds)
+    while idx < matchCount:
+        matchId = matchIds[idx]
         query = matchQuery.format(matchId, KEY)
         req = requests.get(query)
-        res.append(req.text)
+        
+        while '{"error":"rate limit exceeded"}' in req.text:
+            print 'Error sleep 1 sec'
+            
+            time.sleep(10)
+            if res:
+                with open(ROOT_PATH + '\\src\\data\\rawData.txt', 'a+') as stream:
+                    for line in res:
+                        try:
+                            line = line.encode('ascii',errors='ignore')
+                            stream.write(line + '\n')
+                        except Exception as e:
+                            print e        
+                res = []
+            req = requests.get(query)
 
-        if idx > 0 and idx % 100 == 0:
-            with open(ROOT_PATH + '\\src\\data\\rawData.txt', 'a+') as stream:
-                for line in res:
-                    try:
-                        line = line.encode('ascii',errors='ignore')
-                        stream.write(line + '\n')
-                    except Exception as e:
-                        print e
-                        
-            res = []
-            print 'get match {}'.format(idx)
+        res.append(req.text)
+        req.connection.close()
+        print 'get match {}'.format(idx)
+        idx += 1
+            
+        
         
 def run():
     matchIds = getMatchIds()
-    #getMatchData(matchIds)
+    getMatchData(matchIds)
 if __name__ == '__main__':
     run()
