@@ -1,94 +1,33 @@
 import json
 import os
 import math
+from utils.heroid import heroes
+from dotaPicker.getData import Hero
 
 UNCERTAIN_ACTIONS = ['purchase_time', 'kills_log']
 MIN_ACTIONS = ['dn_t', 'gold_t', 'lh_t', 'xp_t',]
 ROOT_PATH = os.path.abspath('..')
 
-
-class MatchObject(object):
-    def __init__(self, matchData):
-        self.matchData = matchData
-        self.res = {}
-    
-    def getFuncAndSide(self, info):
-        if 'barracks_status' in info:
-            funcName = 'barracks_status'
-
-        if 'tower_status' in info:
-            funcName = 'tower_status'  
-
-        if 'radiant'in info:
-            side = 'radiant'
-        elif 'dire' in info:
-            side = 'dire'
-        else:
-            side = ''
-
-        return funcName, side
-
-    def getPlay(self, code):
-        code = '{:08b}'.format(int(code))
-        side = 'dire' if code[0] == 1 else 'radiant'
-        palyerNumber = str(int(code[-3:],2))
-
-    def objectives(self, info, side):
-        for event in info:
-            if 'slot' in event:
-                code = event['slot']
-                palyerNumber, side = self.getPlay(code)
-
-        return palyerNumber, side
-
-    def tower_states(self, code, side):
-        names = ['ancientBottom',
-        'ancientTop',
-        'bottomTier3',
-        'bottomTier2',
-        'bottomTier1',
-        'middleTier3',
-        'middleTier2',
-        'middleTier1',
-        'topTier3',
-        'topTier2',
-        'topTier1',]
-
-        code = '{:011b}'.format(int(code))
-        names = ['{}_{}'.format(name, side) for name in names]
-        
-        for name, val in zip(names, code[1:]):
-            self.res[name] = val
-
-    def barracks_status(self, code, side):
-        names =['bottomRanged ',
-        'bottomMelee',
-        'middleRanged',
-        'middleMelee',
-        'topRanged',
-        'topMelee',]
-
-        names = ['{}_{}'.format(name, side) for name in names] 
-        code = '{:08b}'.format(int(code))
-
-        for name, val in zip(names, code[2:]):
-            self.res[name] = val
-
-
 class NonDataException(Exception):
     def __init__(self,*args,**kwargs):
         Exception.__init__(self,*args,**kwargs)
 
-def flatData(matchData):
+def genHeroNameMapping():
+    return {item['id']:item['localized_name'] for item in heroes if item['localized_name']}
+        
+def flatData(matchData, mapping, calc, itemMapping):
     if 'radiant_win' not in matchData:
          raise NonDataException('Missing Win')
     matchResult = int(matchData['radiant_win'])
     featureValue = {}
+    heroNames = {}
     duration = matchData['duration']
-    calcFunc = lambda numA, numB: math.log((1.0 * j + 1) / (i + 1)) * 100
+   
     for idx, playerInfo in enumerate(matchData['players']):
         side =  'radiant' if playerInfo['isRadiant'] else 'dire'
-        #heroId= playerInfo['hero_id']
+        if side not in heroNames:
+            heroNames[side] = []
+        heroNames[side].append(mapping[int(playerInfo['hero_id'])])
 
         for key in MIN_ACTIONS:
             name = '{}_{}_{}'.format(side, idx, key)
@@ -96,12 +35,16 @@ def flatData(matchData):
             if not value:
                 raise NonDataException(key)
                 
-            featureValue[name] = [calcFunc(i, j) for i,j in zip(value, value[1:])]
+            featureValue[name] = value #[calcFunc(i, j) for i,j in zip(value, value[1:])]
 
 
         for key in UNCERTAIN_ACTIONS:
+            flag = False
             value = [0] * (duration // 60)
+            value1 = [0] * (duration // 60)
             name = '{}_{}_{}'.format(side, idx, key)
+            kdaName = '{}_{}_{}_{}'.format(side, idx, key, 'kda')
+            assistName = '{}_{}_{}_{}'.format(side, idx, key, 'assist')
             itemDatas = playerInfo[key]
             if not isinstance(itemDatas, list):
                 itemDatas = [itemDatas]
@@ -110,16 +53,34 @@ def flatData(matchData):
                 for k, v in itemData.iteritems():
                     if v > duration:
                         continue
-                    #findItemValue(k)
                     seekIdx = (v//60) - 1
                     if seekIdx > len(value):
                         continue
                     try:
-                        value[seekIdx] = 1
-                    except:
-                        print 'error'
+                        if k != 'time':
+                            k = ''.join(k.split('_')).capitalize()
+                            flag = True
+                            if k in itemMapping:
+                                itemV = itemMapping[k]
+                            else:
+                                itemV = itemMapping['Default']
 
-            featureValue[name] = value
+                            value[seekIdx] += float(itemV[0])
+                            value1[seekIdx] += float(itemV[-1])
+                        else:
+                            value[seekIdx] += 1
+                    except Exception as e:
+                        print 'error', e
+                        print value
+            if flag:
+                featureValue[kdaName] = value
+                featureValue[assistName] = value1
+            else:
+                featureValue[name] = value
+
+    for name, item in calc.calcAdvantagePercentages(heroNames['dire'], heroNames['radiant']).iteritems():
+        featureValue[name] = [item] * (duration // 60)
+
     return matchResult, featureValue
 
 def saveData(rawData, path, isLabel=False):
@@ -135,13 +96,29 @@ def saveData(rawData, path, isLabel=False):
             except Exception as e:
                 print e
                
+def loadItemValue():
+    import datetime
+    today = datetime.date.today()
+    res = {}
+    kda, assis = 0,0 
+    with open(ROOT_PATH + '\\src\\data\\itemValue{}_{}.csv'.format(today.month, today.year), 'rb') as stream:
+        for line in stream:
+            line = line.split(',')
+            res[line[0]] = line[1:]
+            kda += float(line[1])
+            assis += float(line[-1])
+    res['Default'] = [kda/len(res), assis/len(res)]
+    return res
 
 def run():
     res = []
+    mapping = genHeroNameMapping()
+    itemMapping = loadItemValue()
+    calc = Hero() 
     with open(ROOT_PATH + '\\src\\data\\rawData.txt', 'rb') as stream:
         for idx, line in enumerate(stream):
             try:
-                value = flatData(json.loads(line))
+                value = flatData(json.loads(line), mapping, calc, itemMapping)
                 res.append(value)
             except NonDataException as e:
                 print 'Error ', idx, e

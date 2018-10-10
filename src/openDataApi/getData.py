@@ -59,10 +59,31 @@ def getMatchData(matchIds):
         print 'get match {}'.format(idx)
         idx += 1
             
-        
+def getWeeklyItemValueData():
+    import urllib2
+    from bs4 import BeautifulSoup as bs
+    import datetime
+    req = urllib2.Request('https://www.dotabuff.com/items/impact?date=month', headers = {'User-agent': 'your bot 0.1'})
+    response = urllib2.urlopen(req)
+    html = response.read()
+    soup = bs(html)
+    res, tmp = [], []
+    for item in soup.findAll('td'):
+        line = item.text.strip()
+        if not line:
+            res.append(','.join(tmp))
+            tmp = []
+        tmp.append(line)
+    today=datetime.date.today()
+    with open(ROOT_PATH + '\\src\\data\\itemValue{}_{}.csv'.format(today.month, today.year), 'w') as stream:
+        for line in res:
+            stream.write(line +'\n')
+
         
 def run():
     matchIds = getMatchIds()
     getMatchData(matchIds)
+    getWeeklyItemValueData()
+
 if __name__ == '__main__':
     run()

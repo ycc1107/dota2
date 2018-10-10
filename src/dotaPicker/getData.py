@@ -34,13 +34,16 @@ class Hero(object):
 
     def isInputValid(self, radiant, dire):
         if not (radiant and dire):
+            print 'missing data'
             return False
         if len(radiant) != len(dire):
+            print 'length diff'
             return False
         if not (len(radiant) == 5 and  len(dire) == 5):
+            print 'not full'
             return False
-        if not all(item in heroList for item in radiant + dire):
-            return False
+        # if not all(item in heroList for item in radiant + dire):
+        #     return False
         
         return True
 
@@ -48,9 +51,10 @@ class Hero(object):
         if not self.isInputValid(radiant, dire):
             raise Exception('Wrong')
 
-        radiantIdx = [heroList.index(name) for name in radiant]
-        direIdx = [heroList.index(name) for name in dire]
-        
+        radiantIdx = [heroList.index(name) if name in heroList else 0 for name in radiant]
+        direIdx = [heroList.index(name) if name in heroList else 0 for name in dire]
+
+
         radiantSynergy, radiantCounterpick, radiantNumAdvOver, direSynergy, direCounterpick, direNumAdvOver = self.teamStats(radiantIdx, direIdx)
 
         radiantSynergyDiff = radiantSynergy - direSynergy
@@ -59,12 +63,16 @@ class Hero(object):
         direSynergyDiff = -1 * radiantSynergyDiff
         direCounterDiff = -1 * radiantCounterDiff
 
-        return (radiantSynergy, radiantCounterpick, 
-                radiantSynergyDiff, radiantCounterDiff,
-                radiantNumAdvOver,
-                direSynergy, direCounterpick, 
-                direSynergyDiff, direCounterDiff,
-                direNumAdvOver)
+        return {'radiantSynergy': radiantSynergy, 
+                'radiantCounterpick': radiantCounterpick, 
+                'radiantSynergyDiff': radiantSynergyDiff, 
+                'radiantCounterDiff': radiantCounterDiff,
+                'radiantNumAdvOver': radiantNumAdvOver,
+                'direSynergy': direSynergy, 
+                'direCounterpick': direCounterpick, 
+                'direSynergyDiff': direSynergyDiff, 
+                'direCounterDiff': direCounterDiff,
+                'direNumAdvOver': direNumAdvOver}
 
 if __name__ == '__main__':
     dire = ['Abaddon',
